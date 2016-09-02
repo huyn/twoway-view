@@ -60,6 +60,16 @@ public class LayoutAdapter extends RecyclerView.Adapter<LayoutAdapter.SimpleView
         mLayoutId = layoutId;
     }
 
+    public void update() {
+        int size = mItems.size();
+        for(int i=0; i<20; i++) {
+            int position = size + i;
+            int id = mCurrentItemId++;
+            mItems.add(position, id);
+        }
+        notifyDataSetChanged();
+    }
+
     public void addItem(int position) {
         final int id = mCurrentItemId++;
         mItems.add(position, id);

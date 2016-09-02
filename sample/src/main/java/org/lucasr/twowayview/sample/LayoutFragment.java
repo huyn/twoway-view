@@ -47,6 +47,8 @@ public class LayoutFragment extends Fragment {
     private TextView mStateText;
     private Toast mToast;
 
+    private LayoutAdapter mAdapter;
+
     private int mLayoutId;
 
     public static LayoutFragment newInstance(int layoutId) {
@@ -125,7 +127,17 @@ public class LayoutFragment extends Fragment {
         final Drawable divider = getResources().getDrawable(R.drawable.divider);
         mRecyclerView.addItemDecoration(new DividerItemDecoration(divider));
 
-        mRecyclerView.setAdapter(new LayoutAdapter(activity, mRecyclerView, mLayoutId));
+        mAdapter = new LayoutAdapter(activity, mRecyclerView, mLayoutId);
+        mRecyclerView.setAdapter(mAdapter);
+
+        View add = view.getRootView().findViewById(R.id.add);
+        if(add != null)
+            add.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mAdapter.update();
+                }
+            });
     }
 
     private void updateState(int scrollState) {
