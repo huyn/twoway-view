@@ -37,93 +37,6 @@ import static org.lucasr.twowayview.widget.Sizes.calculateLaneSize;
 public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
     private static final String LOGTAG = "FlowGalleryLayoutManager";
 
-    protected static class ItemEntry implements Parcelable {
-        public int startLane;
-        public int anchorLane;
-
-        private int[] spanMargins;
-
-        public ItemEntry(int startLane, int anchorLane) {
-            this.startLane = startLane;
-            this.anchorLane = anchorLane;
-        }
-
-        public ItemEntry(Parcel in) {
-            startLane = in.readInt();
-            anchorLane = in.readInt();
-
-            final int marginCount = in.readInt();
-            if (marginCount > 0) {
-                spanMargins = new int[marginCount];
-                for (int i = 0; i < marginCount; i++) {
-                    spanMargins[i] = in.readInt();
-                }
-            }
-        }
-
-        @Override
-        public int describeContents() {
-            return 0;
-        }
-
-        @Override
-        public void writeToParcel(Parcel out, int flags) {
-            out.writeInt(startLane);
-            out.writeInt(anchorLane);
-
-            final int marginCount = (spanMargins != null ? spanMargins.length : 0);
-            out.writeInt(marginCount);
-
-            for (int i = 0; i < marginCount; i++) {
-                out.writeInt(spanMargins[i]);
-            }
-        }
-
-        void setLane(SizeInfo laneInfo) {
-            startLane = laneInfo.startLane;
-            anchorLane = laneInfo.anchorLane;
-        }
-
-        void invalidateLane() {
-            startLane = Lanes.NO_LANE;
-            anchorLane = Lanes.NO_LANE;
-            spanMargins = null;
-        }
-
-        private boolean hasSpanMargins() {
-            return (spanMargins != null);
-        }
-
-        private int getSpanMargin(int index) {
-            if (spanMargins == null) {
-                return 0;
-            }
-
-            return spanMargins[index];
-        }
-
-        private void setSpanMargin(int index, int margin, int span) {
-            if (spanMargins == null) {
-                spanMargins = new int[span];
-            }
-
-            spanMargins[index] = margin;
-        }
-
-        public static final Creator<ItemEntry> CREATOR
-                = new Creator<ItemEntry>() {
-            @Override
-            public ItemEntry createFromParcel(Parcel in) {
-                return new ItemEntry(in);
-            }
-
-            @Override
-            public ItemEntry[] newArray(int size) {
-                return new ItemEntry[size];
-            }
-        };
-    }
-
     private enum UpdateOp {
         ADD,
         REMOVE,
@@ -133,9 +46,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
     private Sizes mLanes;
     private Sizes mLanesToRestore;
-
-    private FlowGalleryItemEntries mItemEntries;
-    private FlowGalleryItemEntries mItemEntriesToRestore;
 
     protected final Rect mChildFrame = new Rect();
     protected final Rect mTempRect = new Rect();
@@ -153,32 +63,26 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
         super(orientation);
     }
 
-    protected void pushChildFrame(ItemEntry entry, Rect childFrame, int lane, int laneSpan,
+    protected void pushChildFrame(Rect childFrame, int lane, int laneSpan,
                                   Direction direction) {
-        final boolean shouldSetMargins = (direction == Direction.END &&
-                                          entry != null && !entry.hasSpanMargins());
-
         for (int i = lane; i < lane + laneSpan; i++) {
             final int spanMargin;
-            if (entry != null && direction != Direction.END) {
-                spanMargin = entry.getSpanMargin(i - lane);
+            if (direction != Direction.END) {
+                spanMargin = 0;
             } else {
                 spanMargin = 0;
             }
 
-            final int margin = mLanes.pushChildFrame(childFrame, i, spanMargin, direction);
-            if (laneSpan > 1 && shouldSetMargins) {
-                entry.setSpanMargin(i - lane, margin, laneSpan);
-            }
+            mLanes.pushChildFrame(childFrame, i, spanMargin, direction);
         }
     }
 
-    private void popChildFrame(ItemEntry entry, Rect childFrame, int lane, int laneSpan,
+    private void popChildFrame(Rect childFrame, int lane, int laneSpan,
                                Direction direction) {
         for (int i = lane; i < lane + laneSpan; i++) {
             final int spanMargin;
-            if (entry != null && direction != Direction.END) {
-                spanMargin = entry.getSpanMargin(i - lane);
+            if (direction != Direction.END) {
+                spanMargin = 0;
             } else {
                 spanMargin = 0;
             }
@@ -200,40 +104,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
     Sizes getLanes() {
         return mLanes;
-    }
-
-    void setItemEntryForPosition(int position, ItemEntry entry) {
-        if (mItemEntries != null) {
-            mItemEntries.putItemEntry(position, entry);
-        }
-    }
-
-    ItemEntry getItemEntryForPosition(int position) {
-        return (mItemEntries != null ? mItemEntries.getItemEntry(position) : null);
-    }
-
-    void clearItemEntries() {
-        if (mItemEntries != null) {
-            mItemEntries.clear();
-        }
-    }
-
-    void invalidateItemLanesAfter(int position) {
-        if (mItemEntries != null) {
-            mItemEntries.invalidateItemLanesAfter(position);
-        }
-    }
-
-    void offsetForAddition(int positionStart, int itemCount) {
-        if (mItemEntries != null) {
-            mItemEntries.offsetForAddition(positionStart, itemCount);
-        }
-    }
-
-    void offsetForRemoval(int positionStart, int itemCount) {
-        if (mItemEntries != null) {
-            mItemEntries.offsetForRemoval(positionStart, itemCount);
-        }
     }
 
     private void requestMoveLayout() {
@@ -272,38 +142,10 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
         requestMoveLayout();
 
-        if (mItemEntries == null) {
-            mItemEntries = new FlowGalleryItemEntries();
-        }
-
-        if (oldLanes != null && oldLanes.getOrientation() == mLanes.getOrientation() &&
-                oldLanes.getLaneSize() == mLanes.getLaneSize()) {
-            invalidateItemLanesAfter(0);
-        } else {
-            mItemEntries.clear();
-        }
-
         return true;
     }
 
     private void handleUpdate(int positionStart, int itemCountOrToPosition, UpdateOp cmd) {
-        invalidateItemLanesAfter(positionStart);
-
-        switch (cmd) {
-            case ADD:
-                offsetForAddition(positionStart, itemCountOrToPosition);
-                break;
-
-            case REMOVE:
-                offsetForRemoval(positionStart, itemCountOrToPosition);
-                break;
-
-            case MOVE:
-                offsetForRemoval(positionStart, 1);
-                offsetForAddition(itemCountOrToPosition, 1);
-                break;
-        }
-
         if (positionStart + itemCountOrToPosition <= getFirstVisiblePosition()) {
             return;
         }
@@ -336,10 +178,8 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
         final boolean restoringLanes = (mLanesToRestore != null);
         if (restoringLanes) {
             mLanes = mLanesToRestore;
-            mItemEntries = mItemEntriesToRestore;
 
             mLanesToRestore = null;
-            mItemEntriesToRestore = null;
         }
 
         final boolean refreshingLanes = ensureLayoutState();
@@ -351,10 +191,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
         }
 
         final int itemCount = state.getItemCount();
-
-        if (mItemEntries != null) {
-            mItemEntries.setAdapterSize(itemCount);
-        }
 
         final int anchorItemPosition = getAnchorItemPosition(state);
 
@@ -401,7 +237,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
     @Override
     public void onItemsChanged(RecyclerView recyclerView) {
-        clearItemEntries();
         super.onItemsChanged(recyclerView);
     }
 
@@ -420,7 +255,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
         state.orientation = getOrientation();
         state.laneSize = (mLanes != null ? mLanes.getLaneSize() : 0);
-        state.itemEntries = mItemEntries;
 
         return state;
     }
@@ -431,7 +265,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
         if (ss.lanes != null && ss.laneSize > 0) {
             mLanesToRestore = new Sizes(this, ss.orientation, ss.lanes, ss.laneSize);
-            mItemEntriesToRestore = ss.itemEntries;
         }
 
         super.onRestoreInstanceState(ss.getSuperState());
@@ -470,7 +303,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
     @Override
     protected void measureChild(View child, Direction direction) {
-        cacheChildLaneAndSpan(child, direction);
         measureChildWithMargins(child);
     }
 
@@ -480,14 +312,13 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
         mLanes.getChildFrame(mChildFrame, getDecoratedMeasuredWidth(child),
                 getDecoratedMeasuredHeight(child), mTempLaneInfo, direction);
-        final ItemEntry entry = cacheChildFrame(child, mChildFrame);
 
         layoutDecorated(child, mChildFrame.left, mChildFrame.top, mChildFrame.right,
                 mChildFrame.bottom);
 
         final LayoutParams lp = (LayoutParams) child.getLayoutParams();
         if (!lp.isItemRemoved()) {
-            pushChildFrame(entry, mChildFrame, mTempLaneInfo.startLane,
+            pushChildFrame(mChildFrame, mTempLaneInfo.startLane,
                     getLaneSpanForChild(child), direction);
         }
     }
@@ -498,7 +329,7 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
         getLaneForPosition(mTempLaneInfo, position, direction);
         getDecoratedChildFrame(child, mChildFrame);
 
-        popChildFrame(getItemEntryForPosition(position), mChildFrame, mTempLaneInfo.startLane,
+        popChildFrame(mChildFrame, mTempLaneInfo.startLane,
                 getLaneSpanForChild(child), direction);
     }
 
@@ -512,16 +343,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
     int getLaneSpanForPosition(int position) {
         return 1;
-    }
-
-    ItemEntry cacheChildLaneAndSpan(View child, Direction direction) {
-        // Do nothing by default.
-        return null;
-    }
-
-    ItemEntry cacheChildFrame(View child, Rect childFrame) {
-        // Do nothing by default.
-        return null;
     }
 
     @Override
@@ -569,7 +390,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
         private Orientation orientation;
         private Rect[] lanes;
         private int laneSize;
-        private FlowGalleryItemEntries itemEntries;
 
         protected FlowSavedState(Parcelable superState) {
             super(superState);
@@ -590,15 +410,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
                     lanes[i] = lane;
                 }
             }
-
-            final int itemEntriesCount = in.readInt();
-            if (itemEntriesCount > 0) {
-                itemEntries = new FlowGalleryItemEntries();
-                for (int i = 0; i < itemEntriesCount; i++) {
-                    final ItemEntry entry = in.readParcelable(getClass().getClassLoader());
-                    itemEntries.restoreItemEntry(i, entry);
-                }
-            }
         }
 
         @Override
@@ -613,13 +424,6 @@ public abstract class FlowGalleryLayoutManager extends TwoWayLayoutManager {
 
             for (int i = 0; i < laneCount; i++) {
                 lanes[i].writeToParcel(out, Rect.PARCELABLE_WRITE_RETURN_VALUE);
-            }
-
-            final int itemEntriesCount = (itemEntries != null ? itemEntries.size() : 0);
-            out.writeInt(itemEntriesCount);
-
-            for (int i = 0; i < itemEntriesCount; i++) {
-                out.writeParcelable(itemEntries.getItemEntry(i), flags);
             }
         }
 
